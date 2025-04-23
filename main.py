@@ -15,7 +15,7 @@ from forms import RegisterForm, LoginForm
 import uuid
 from werkzeug.security import generate_password_hash, check_password_hash
 from forms import RegisterForm, LoginForm  # Assuming you've created these using Flask-WTF
-from models import ChatUser  # Your model
+from models import ChatUser, DictionaryEntry, ChatHistory, ChatSummary
 from db import db
 
 
@@ -26,7 +26,15 @@ app.config['SECRET_KEY'] = os.getenv("APP_SECRETKEY")
 bootstrap = Bootstrap5(app)
 
 
-load_dotenv()  # load .env if exists
+
+# Automatically detect where the .env file is — works both locally and on PythonAnywhere
+basedir = os.path.abspath(os.path.dirname(__file__))
+dotenv_path = os.path.join(basedir, '.env')
+
+# Only load if .env exists
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
+
 db_uri = os.getenv("DATABASE_URL", "sqlite:///local-chinese-dict.db")
 app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
 
@@ -34,7 +42,7 @@ db.init_app(app)
 migrate = Migrate(app, db)
 CORS(app)
 
-from models import ChatUser, DictionaryEntry, ChatHistory, ChatSummary
+
 
 # Ensure app context for database operations
 with app.app_context():
