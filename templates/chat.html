@@ -1,0 +1,202 @@
+<!-- templates/register.html or login.html -->
+{% from "bootstrap5/form.html" import render_form %}
+{% block content %}
+{% include "header.html" %}
+
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Language Learning Chatbot</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 700px; margin: auto; padding: 20px; }
+        .chat-box { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: auto; margin-top: 10px; }
+        .message { margin: 10px 0; }
+        .user { font-weight: bold; }
+        .bot { color: #007bff; }
+        .character-img { width: 60px; vertical-align: middle; margin-right: 10px; border-radius: 50%; }
+        .dictionary { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
+        .word-entry { display: inline-block; margin: 5px; padding: 5px 10px; background: #f1f1f1; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h2>Practice Chinese with a Character</h2>
+
+    <label for="character-select">Choose your partner:</label>
+    <select id="character-select" onchange="updateCharacter()">
+        {% for level, char in characters.items() %}
+            <option value="{{ level }}">{{ level }} - {{ char.name }}</option>
+        {% endfor %}
+    </select>
+    <img id="character-img" src="/static/characters/a1.jpg" class="character-img" alt="Character">
+
+    <div class="chat-box" id="chat-box"></div>
+    <input type="text" id="user-input" placeholder="Say something..." style="width: 80%;">
+    <button onclick="sendMessage()">Send</button>
+    <button onclick="togglePinyin()">Toggle Pinyin</button>
+
+    <h3>Your Dictionary</h3>
+    <div id="dictionary" class="dictionary"></div>
+
+    <!-- MandarinSpot -->
+    <script src="//mandarinspot.com/static/mandarinspot.min.js" charset="UTF-8"></script>
+    <script>
+        const user_id = "{{ current_user.id if current_user.is_authenticated else session.get('guest_user_id') }}";
+        const characterData = {{ characters | tojson }};
+        let currentLevel = "A1";
+        let pinyinVisible = false;
+        const userDictionary = new Set();
+
+        window.addEventListener("DOMContentLoaded", () => {
+        fetch("/get_dictionary")
+            .then(response => response.json())
+            .then(words => {
+                words.forEach(word => {
+                    userDictionary.add(word.chinese);
+                    const entry = document.createElement("span");
+                    entry.className = "word-entry";
+                    entry.textContent = word.chinese;
+                    document.getElementById("dictionary").appendChild(entry);
+                });
+            });
+    });
+
+        function updateCharacter() {
+            currentLevel = document.getElementById("character-select").value;
+            const img = document.getElementById("character-img");
+            img.src = `/static/characters/${currentLevel.toLowerCase()}.png`;
+        }
+
+        function togglePinyin() {
+            pinyinVisible = !pinyinVisible;
+            mandarinspot.showInline(pinyinVisible ? "visible" : "hidden");
+        }
+
+    function addToDictionary(word, pinyin = "", translation = "") {
+        if (!userDictionary.has(word)) {
+            userDictionary.add(word);
+
+            const dict = document.getElementById("dictionary");
+            const entry = document.createElement("span");
+            entry.className = "word-entry";
+            entry.textContent = word;
+            dict.appendChild(entry);
+
+            fetch("/save_word", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    word: word,
+                    pinyin: pinyin,
+                    translation: translation
+                })
+            });
+        }
+    }
+
+    function attachDictionaryClickHandlers() {
+    const allRbElements = document.querySelectorAll("rb");
+    allRbElements.forEach(rb => {
+        rb.addEventListener("click", () => {
+            const word = rb.textContent.trim();
+            if (word) {
+                addToDictionary(word);
+            }
+        });
+    });
+    }
+
+async function sendMessage() {
+    const input = document.getElementById("user-input");
+    const message = input.value.trim();
+    if (!message) return;
+
+    const chatBox = document.getElementById("chat-box");
+
+    // Append and annotate user's message
+    const userMessage = document.createElement("div");
+    userMessage.className = "message";
+    userMessage.innerHTML = `<span class="user">You:</span> <span class="user-text">${message}</span>`;
+    chatBox.appendChild(userMessage);
+
+    mandarinspot.annotate(userMessage.querySelector(".user-text"), { inline: true, popup: true, force: true });
+
+    setTimeout(() => {
+        attachDictionaryClickHandlers();
+    }, 300); // short delay to wait for <ruby> to render
+
+    input.value = "";
+
+    // Get bot response
+    const response = await fetch("/chat", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            message,
+            level: currentLevel,
+            user_id: user_id  // Pass user_id (either guest or authenticated)
+        })
+    });
+
+    const data = await response.json();
+
+    // Append and annotate bot response
+    const botMessage = document.createElement("div");
+    botMessage.className = "message";
+    botMessage.innerHTML = `<span class="bot">${characterData[currentLevel].name}:</span> <span class="bot-text">${data.reply}</span>`;
+    chatBox.appendChild(botMessage);
+
+    mandarinspot.annotate(botMessage.querySelector(".bot-text"), { inline: true, popup: true, force: true });
+
+    setTimeout(() => {
+        attachDictionaryClickHandlers();
+    }, 300); // short delay to wait for <ruby> to render
+
+
+
+
+
+    // Wait for DOM updates before attaching events
+    setTimeout(() => {
+    const allWords = chatBox.querySelectorAll(".popup_word");
+    allWords.forEach(wordElem => {
+        wordElem.addEventListener("click", () => {
+            const word = wordElem.getAttribute("base");
+            const pinyin = wordElem.getAttribute("pinyin") || "";
+            const translation = wordElem.getAttribute("definition") || "";
+
+            if (word) {
+                addToDictionary(word, pinyin, translation);
+            }
+        });
+    });
+}, 500);
+
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+setTimeout(() => {
+    const testPopup = document.querySelector(".popup_word");
+    if (testPopup) {
+        console.log("base:", testPopup.getAttribute("base"));
+        console.log("pinyin:", testPopup.getAttribute("pinyin"));
+        console.log("definition:", testPopup.getAttribute("definition"));
+    } else {
+        console.warn("No popup_word found");
+    }
+
+    attachDictionaryClickHandlers();
+}, 500);
+
+    </script>
+</body>
+</html>
+
+{% include "footer.html" %}
+{% endblock %}
+
+

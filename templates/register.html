@@ -1,0 +1,31 @@
+<!-- templates/login.html or register.html -->
+{% from "bootstrap5/form.html" import render_form %}
+{% block content %}
+  {% include "header.html" %}
+
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show mt-3" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="row justify-content-center">
+      <div class="col-md-6">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h3 class="card-title text-center mb-4">{{ 'Log In' if request.path == url_for('login') else 'Register' }}</h3>
+            {{ render_form(form, novalidate=True, button_map={"submit": "primary"}) }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% include "footer.html" %}
+{% endblock %}
