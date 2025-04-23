@@ -20,7 +20,7 @@ from db import db
 
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = '8BYkEfBA6O6donzWlSihBXox7C0sKR6babcdefg'
+app.config['SECRET_KEY'] = os.getenv("APP_SECRETKEY")
 
 # Initialize Bootstrap5
 bootstrap = Bootstrap5(app)
@@ -49,7 +49,8 @@ def load_user(user_id):
     return db.session.get(ChatUser, user_id)  # Avoid unnecessary joins or relationships
 
 # Set your Gemini API key
-genai.configure(api_key="AIzaSyCkayENRPF9NMd3oQnxDFIOh8aIBPcoczg")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 # Define characters by CEFR level
