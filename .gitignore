@@ -1,0 +1,5 @@
+# Ignore environment settings
+.env
+
+# Ignore local database
+instance/*.db
