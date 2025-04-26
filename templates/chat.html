@@ -20,6 +20,18 @@
     </style>
 </head>
 <body>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show mt-3" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
     <h2>Practice Chinese with a Character</h2>
 
     <label for="character-select">Choose your partner:</label>
@@ -32,8 +44,24 @@
 
     <div class="chat-box" id="chat-box"></div>
     <input type="text" id="user-input" placeholder="Say something..." style="width: 80%;">
-    <button onclick="sendMessage()">Send</button>
-    <button onclick="togglePinyin()">Toggle Pinyin</button>
+    <button class="fancy-button" onclick="sendMessage()">Send</button>
+    <button class="fancy-button" onclick="togglePinyin()">Toggle Pinyin</button>
+
+
+            <!-- Save a Memory Button -->
+            <button id="save-memory-btn" class="fancy-button">Save a Memory</button>
+
+            <!-- Modal -->
+            <div id="summary-modal" class="modal">
+                <div class="modal-content">
+                    <h2>Save a Memory</h2>
+                    <textarea id="summary-text" rows="8" placeholder="Write your memory here..."></textarea>
+                    <div class="modal-buttons">
+                        <button id="save-summary-btn" class="modal-save">Save</button>
+                        <button id="close-summary-btn" class="modal-cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
 
     <h3>Your Dictionary</h3>
     <div id="dictionary" class="dictionary"></div>
@@ -61,11 +89,91 @@
             });
     });
 
-        function updateCharacter() {
-            currentLevel = document.getElementById("character-select").value;
-            const img = document.getElementById("character-img");
-            img.src = `/static/characters/${currentLevel.toLowerCase()}.png`;
-        }
+
+
+document.getElementById("save-memory-btn").addEventListener("click", function() {
+    console.log("Save Memory button clicked!");
+
+    fetch("/summarize", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            user_id: "{{ current_user.id if current_user.is_authenticated else session.get('guest_user_id') }}",
+            level: "A1" // or dynamically your currentLevel
+        }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log("Received summary:", data.summary);
+        document.getElementById("summary-text").value = data.summary || "";
+        document.getElementById("summary-modal").style.display = "block"; // Show the modal
+    })
+    .catch(error => {
+        console.error("Error fetching summary:", error);
+    });
+});
+
+// Save summary
+document.getElementById("save-summary-btn").addEventListener("click", function() {
+    const editedSummary = document.getElementById("summary-text").value;
+
+    fetch("/save_summary", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            user_id: "{{ current_user.id if current_user.is_authenticated else session.get('guest_user_id') }}",
+            level: "A1",  // or your dynamic currentLevel
+            summary: editedSummary
+        }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert("Memory saved successfully!");
+        closeModal();
+    })
+    .catch(error => {
+        console.error("Error saving memory:", error);
+    });
+});
+
+// Close modal
+document.getElementById("close-summary-btn").addEventListener("click", function() {
+    closeModal();
+});
+
+function closeModal() {
+    document.getElementById("summary-modal").style.display = "none";
+}
+
+
+
+
+
+
+function updateCharacter() {
+    currentLevel = document.getElementById("character-select").value;
+    const img = document.getElementById("character-img");
+    img.src = `/static/characters/${currentLevel.toLowerCase()}.jpg`; // or .png depending on your files
+
+    // Clear current chat
+    const chatBox = document.getElementById("chat-box");
+    chatBox.innerHTML = "";
+
+    // Fetch chat history for the selected character
+    fetch(`/get_chat_history/${currentLevel}`)
+        .then(response => response.json())
+        .then(history => {
+            history.forEach(entry => {
+                displayMessage(entry.message, "user");
+                displayMessage(entry.reply, "bot");
+            });
+        });
+}
+
 
         function togglePinyin() {
             pinyinVisible = !pinyinVisible;
@@ -107,6 +215,36 @@
         });
     });
     }
+
+    function displayMessage(text, sender) {
+    const chatBox = document.getElementById("chat-box");
+    const messageDiv = document.createElement("div");
+    messageDiv.className = "message";
+
+    if (sender === "user") {
+        messageDiv.innerHTML = `<span class="user">You:</span> <span class="user-text">${text}</span>`;
+    } else if (sender === "bot") {
+        messageDiv.innerHTML = `<span class="bot">${characterData[currentLevel].name}:</span> <span class="bot-text">${text}</span>`;
+    }
+
+    chatBox.appendChild(messageDiv);
+
+    // Annotate new messages (important for pinyin etc.)
+    if (sender === "user") {
+        mandarinspot.annotate(messageDiv.querySelector(".user-text"), { inline: true, popup: true, force: true });
+    } else {
+        mandarinspot.annotate(messageDiv.querySelector(".bot-text"), { inline: true, popup: true, force: true });
+    }
+
+    // Attach dictionary click handlers after rendering
+    setTimeout(() => {
+        attachDictionaryClickHandlers();
+    }, 300);
+
+    // Always scroll down
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
 
 async function sendMessage() {
     const input = document.getElementById("user-input");

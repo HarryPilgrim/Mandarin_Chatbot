@@ -144,6 +144,7 @@ def chat():
             history = ChatHistory(user_id=user_id, level=level, message=message, reply=reply)
             db.session.add(history)
             db.session.commit()
+            trim_chat_history(user_id=user_id, level=level)
 
     except Exception as e:
         reply = f"Error: {str(e)}"
@@ -151,31 +152,88 @@ def chat():
     return jsonify({"reply": reply})
 
 
+# Summarize recent conversation (do NOT save yet)
 @app.route("/summarize", methods=["POST"])
 def summarize():
-    data = request.json
-    user_id = data["user_id"]
-    level = data["level"]
-
-    history = ChatHistory.query.filter_by(user_id=user_id, level=level).order_by(ChatHistory.timestamp.desc()).limit(10).all()
-    if not history:
-        return jsonify({"summary": "No history available."})
-
-    conversation = "\n".join([f"User: {h.message}\nBot: {h.reply}" for h in reversed(history)])
+    data = request.get_json()
+    user_id = data.get("user_id")
+    level = data.get("level")
 
     try:
-        summary_response = model.generate_content(f"请总结以下中文对话内容，用中文写一段简洁总结：\n\n{conversation}")
-        summary_text = summary_response.text
-        # Only save if user is logged in
-        if user_id:
-            summary = ChatSummary(user_id=user_id, level=level, summary=summary_text)
-            db.session.add(summary)
-            db.session.commit()
+        history = ChatHistory.query.filter_by(user_id=user_id, level=level)\
+            .order_by(ChatHistory.timestamp.desc())\
+            .all()
+
+        if not history:
+            return jsonify({"summary": "No history available."})
+
+        # Build conversation text
+        conversation = "\n".join([f"User: {h.message}\nBot: {h.reply}" for h in reversed(history)])
+
+        # Ask the model to summarize
+        prompt = f"请总结以下中文对话内容，用中文写一段简洁总结：\n\n{conversation}"
+        summary_response = model.generate_content(prompt)
+        summary_text = summary_response.text.strip()
 
         return jsonify({"summary": summary_text})
-    except Exception as e:
-        return jsonify({"summary": f"Error: {str(e)}"})
 
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
+# Save the summary after user edits it
+@app.route("/save_summary", methods=["POST"])
+def save_summary():
+    data = request.get_json()
+    user_id = data.get("user_id")
+    level = data.get("level")
+    edited_summary = data.get("summary")
+
+    try:
+        if not edited_summary:
+            return jsonify({"error": "Summary cannot be empty."})
+
+        # Check if a summary already exists for this user and level
+        summary = ChatSummary.query.filter_by(user_id=user_id, level=level).first()
+
+        if summary:
+            summary.summary = edited_summary  # Update existing summary
+        else:
+            new_summary = ChatSummary(user_id=user_id, level=level, summary=edited_summary)
+            db.session.add(new_summary)
+
+        db.session.commit()
+        return jsonify({"message": "Summary saved successfully."})
+
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
+def trim_chat_history(user_id, level, max_pairs=20):
+    # Count how many chat pairs the user has at this level
+    total_messages = ChatHistory.query.filter_by(user_id=user_id, level=level)\
+        .order_by(ChatHistory.timestamp.desc()).all()
+
+    # If more than allowed, delete the oldest ones
+    if len(total_messages) > max_pairs:
+        to_delete = total_messages[max_pairs:]  # Keep only the newest max_pairs
+        for entry in to_delete:
+            db.session.delete(entry)
+        db.session.commit()
+
+
+@app.route("/get_chat_history/<level>", methods=["GET"])
+def get_chat_history(level):
+    user_id = current_user.id if current_user.is_authenticated else session.get('guest_user_id')
+
+    if not user_id:
+        return jsonify([])
+
+    history = ChatHistory.query.filter_by(user_id=user_id, level=level).order_by(ChatHistory.timestamp.asc()).all()
+
+    chat_list = [{"message": h.message, "reply": h.reply} for h in history]
+
+    return jsonify(chat_list)
 
 
 @app.route("/save_word", methods=["POST"])
