@@ -3,7 +3,8 @@
 www.studymandarin.org
 
 
-![mandarin chatbot 1](https://github.com/user-attachments/assets/b16c9e97-ce2a-4bba-a2bd-01b38918e9cf)
+![chatbot with hover over](https://github.com/user-attachments/assets/9e5ec604-6808-4d8f-b310-76dfcbcd931b)
+
 
 Mandarin Chatbot is part of a larger vision to create a language learning ecosystem for Chinese learners.
 The goal is to provide a dynamic, AI-powered environment where users can practice Chinese conversation, read authentic materials, and access tutoring services — all in one place.
