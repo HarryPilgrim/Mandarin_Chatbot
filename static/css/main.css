@@ -80,8 +80,8 @@
 }
 
 .character-img {
-    width: 1000px;     /* Set fixed width */
-    height: 100px;    /* Set fixed height */
+    width: 2000px;     /* Set fixed width */
+    height: 80px;    /* Set fixed height */
     object-fit: cover; /* Makes sure the image fills nicely without distortion */
     border-radius: 20px; /* Optional: rounded corners for a nice look */
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3); /* Optional: add a little shadow */
