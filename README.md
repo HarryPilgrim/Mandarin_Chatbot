@@ -51,13 +51,3 @@ Some upcoming plans:
 
 
 
-
-This project is actively being developed. Upcoming work includes:
-
-    Expanding chatbot memory features.
-
-    Adding a complete tutoring booking system with payment integration.
-
-    Enhancing dictionary functionality (custom tags, export options).
-
-    Designing a beautiful mobile-friendly interface.
